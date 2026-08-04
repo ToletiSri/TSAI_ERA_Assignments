@@ -1,50 +1,134 @@
-# The School of AI - ERA(Extensive & Reimagined AI Program) - Assignment 9
+# Session 10 — Custom ResNet on CIFAR-10
 
-This folder consists of Assignment-10 from ERA course offered by - TSAI(The school of AI). 
-Follow https://theschoolof.ai/ for more updates on TSAI
+This folder contains Assignment 10 from the ERA course by The School of AI.
 
-Assignment-10
-Write a custom ResNet architecture for CIFAR10 that has the following architecture:
-###### PrepLayer - 
-Conv 3x3 s1, p1) >> BN >> RELU [64k]
-###### Layer1 -
-X = Conv 3x3 (s1, p1) >> MaxPool2D >> BN >> RELU [128k]
-R1 = ResBlock( (Conv-BN-ReLU-Conv-BN-ReLU))(X) [128k] 
-Add(X, R1)
-###### Layer 2 -
-Conv 3x3 [256k]
-MaxPooling2D
-BN
-ReLU
-###### Layer 3 -
-X = Conv 3x3 (s1, p1) >> MaxPool2D >> BN >> RELU [512k]
-R2 = ResBlock( (Conv-BN-ReLU-Conv-BN-ReLU))(X) [512k]
-Add(X, R2)
-MaxPooling with Kernel Size 4
-###### FC Layer 
-###### SoftMax
+## 1. Problem Statement
 
-###### Uses One Cycle Policy such that:
-Total Epochs = 24
-Max at Epoch = 5
-LRMIN = FIND
-LRMAX = FIND
-NO Annihilation
+Build and train a custom residual network for CIFAR-10 with the following prescribed architecture:
 
-###### Uses this transform -
-RandomCrop 32, 32 (after padding of 4) >> FlipLR >> Followed by CutOut(8, 8)
-Batch size = 512
-Use ADAM, and CrossEntropyLoss
-Target Accuracy: 90%
+- **Preparation layer:** `3×3 Conv (stride=1, padding=1) → BatchNorm → ReLU`, producing 64 channels.
+- **Layer 1:**
+  - `X = 3×3 Conv → MaxPool2d → BatchNorm → ReLU`, producing 128 channels.
+  - `R1 = Conv → BatchNorm → ReLU → Conv → BatchNorm → ReLU`, retaining 128 channels.
+  - Combine the paths using `X + R1`.
+- **Layer 2:** `3×3 Conv → MaxPool2d → BatchNorm → ReLU`, producing 256 channels.
+- **Layer 3:**
+  - `X = 3×3 Conv → MaxPool2d → BatchNorm → ReLU`, producing 512 channels.
+  - `R2 = Conv → BatchNorm → ReLU → Conv → BatchNorm → ReLU`, retaining 512 channels.
+  - Combine the paths using `X + R2`.
+- **Classifier:** apply max pooling with a kernel size of 4, followed by a fully connected layer and class prediction.
 
-The assignment consists of 3 files and 1 folder
-* custom_resnet.py - This file consists of our custom Resnet model, with the architecture stated above
-* utils.py - A utility of commonly used functions. Also consists of helper functions to train and test the model. 
-* S10.ipnyb - Jupyter notebook that consists of the assignment - training and testing CIFAR-10 data with our custom CNN model.
+Use the **One Cycle learning-rate policy** with these constraints:
 
+- Train for 24 epochs.
+- Reach the maximum learning rate at epoch 5.
+- Find suitable minimum and maximum learning rates.
+- Do not use an annihilation phase.
 
-The custom resnet model, defined as per the restrictions mentioned above, has the following model parameters:
+Use this training transform:
 
+```text
+Pad by 4 → RandomCrop(32×32) → HorizontalFlip → CutOut(8×8)
+```
+
+Use a batch size of 512, the Adam optimizer, and cross-entropy loss. The target validation accuracy is **90%**.
+
+## 2. Implementation
+
+### Repository structure
+
+- `custom_resnet.py` defines the custom residual network.
+- `utils.py` contains device, training, evaluation, model-summary, and metric-plotting helpers.
+- `S10.ipynb` prepares CIFAR-10, finds a learning rate, configures the One Cycle policy, trains the model, and reports results.
+
+### Quick revision notes
+
+#### Residual connections
+
+The two residual stages learn a correction to their input rather than an entirely new representation. The shortcut and residual tensors have identical shapes, so they can be added directly:
+
+```python
+x = self.convblockL1X1(x)
+x = x + self.convblockL1R1(x)
+
+x = self.convblockL3X1(x)
+x = x + self.convblockL3R1(x)
+```
+
+This identity path improves gradient flow and allows the convolutional branch to focus on residual features.
+
+#### Spatial and channel progression
+
+```text
+3×32×32 → 64×32×32 → 128×16×16 → 256×8×8
+          → 512×4×4 → 512×1×1 → 10 logits
+```
+
+Each max-pooling operation halves the spatial dimensions while the convolutional stages increase channel capacity. The final `4×4` pool collapses each feature map to one value before classification.
+
+#### Albumentations pipeline
+
+The implemented training pipeline adds optional color jitter to the required crop, flip, and CutOut-style augmentation. Test images are only normalized:
+
+```python
+train_transforms = A.Compose([
+    A.augmentations.transforms.ColorJitter(
+        brightness=0.10, contrast=0.10, saturation=0.10,
+        hue=0.10, always_apply=False, p=0.5),
+    A.PadIfNeeded(min_height=40, min_width=40, always_apply=True),
+    A.RandomCrop(height=32, width=32, always_apply=True),
+    A.HorizontalFlip(),
+    A.Normalize(mean=means, std=stds, always_apply=True),
+    A.CoarseDropout(max_holes=1, min_height=8, max_height=8,
+                    min_width=8, max_width=8, fill_value=means,
+                    always_apply=True),
+    ToTensorV2(),
+])
+```
+
+Padding to `40×40` followed by a `32×32` random crop is equivalent to allowing a four-pixel translation around the original image. `CoarseDropout` implements the required `8×8` CutOut region.
+
+#### Learning-rate selection and scheduling
+
+Before the full training run, an **LR range test** tries progressively larger learning rates over 200 mini-batches. `step_mode="exp"` means that the rate is multiplied by a constant factor between batches, rather than increased by a fixed amount. The test stops when the trial rate reaches 10 and plots loss against learning rate:
+
+```python
+lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
+lr_finder.range_test(
+    train_loader,
+    end_lr=10,
+    num_iter=200,
+    step_mode="exp",
+)
+lr_finder.plot()
+lr_finder.reset()
+```
+
+The value `10` is only the upper boundary of this short search; it is **not** the learning rate used for the 24-epoch training run. The useful region is read from the plot—typically where loss is falling rapidly but before it becomes unstable. Based on that experiment, `4.51e-2` was selected as the maximum rate for `OneCycleLR`.
+
+The full training run then uses Adam with weight decay and steps `OneCycleLR` after every batch:
+
+```python
+optimizer = optim.Adam(model.parameters(), lr=0.03, weight_decay=1e-4)
+criterion = nn.CrossEntropyLoss()
+
+scheduler = OneCycleLR(
+    optimizer,
+    max_lr=4.51e-2,
+    steps_per_epoch=len(train_loader),
+    epochs=24,
+    pct_start=5/24,
+    div_factor=80,
+    three_phase=False,
+    final_div_factor=550,
+)
+```
+
+`pct_start=5/24` places the learning-rate peak at roughly epoch 5. Calling `scheduler.step()` inside the batch loop produces the intended per-iteration schedule.
+
+### Model summary
+
+```text
 ----------------------------------------------------------------
         Layer (type)      |       Output Shape      |   Param #
 ----------------------------------------------------------------
@@ -95,22 +179,22 @@ Forward/backward pass size (MB): 8.00
 Params size (MB): 25.07
 Estimated Total Size (MB): 33.09
 ----------------------------------------------------------------
+```
 
-### RESULTS:
+## 3. Results
 
-By tweaking the albumentations, and oneCycleLR parameters, we have been able to achieve a validation accuracy of 90% by epoch #23
+Tuning the Albumentations pipeline and One Cycle parameters allowed the model to cross the 90% validation target at epoch 23 and improve further at epoch 24.
 
-**Epoch 23**
-Train: Loss=0.3193 Batch_id=97 Accuracy=88.81: 100%|███████████████████████████████████| 98/98 [00:48<00:00,  2.03it/s]
-Test set: Average loss: 0.0006, Accuracy: 9053/10000 (**90.53%**)
-LR = [0.00030234014432884896]
+| Epoch | Train loss | Train accuracy | Validation loss | Validation accuracy | Final learning rate |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 23 | 0.3193 | 88.81% | 0.0006 | **90.53%** | 0.00030234 |
+| 24 | 0.3124 | 89.50% | 0.0006 | **90.63%** | 0.000001057 |
 
-**Epoch 24**
-Train: Loss=0.3124 Batch_id=97 Accuracy=89.50: 100%|███████████████████████████████████| 98/98 [00:47<00:00,  2.06it/s]
-Test set: Average loss: 0.0006, Accuracy: 9063/10000 (**90.63%**)
-LR = [1.0570957086617859e-06]
+The final validation accuracy was **90.63%**, exceeding the assignment target by 0.63 percentage points.
 
-## API Reference - custom_resnet.py
+## 5. API Reference
+
+### `custom_resnet.py`
 
 #### Get CNN model
 
@@ -119,7 +203,7 @@ LR = [1.0570957086617859e-06]
 ```
 
 
-## API Reference - utils.py
+### `utils.py`
 
 #### CUDA Availability
 
@@ -147,7 +231,7 @@ LR = [1.0570957086617859e-06]
 
 #### Get Transform (Crop, Resize, Rotate) for train data
 ```http
-  getTrainTransforms(centerCrop, resize, randomRotate,mean,std_dev)
+  getTrainTransforms_CropRotate(centerCrop, resize, randomRotate, mean, std_dev)
 ```
 
 | Parameter | Type     | Description                |
@@ -172,7 +256,7 @@ LR = [1.0570957086617859e-06]
 
 #### Train model
 ```http
-  train(model, train_loader, optimizer, criterion)
+  train(model, train_loader, optimizer, criterion, scheduler)
 ```
 
 | Parameter | Type     | Description                |
@@ -181,6 +265,7 @@ LR = [1.0570957086617859e-06]
 | train_loader | torch.utils.data.dataloader.DataLoader	 | Required: Loader consisting of train data |
 | optimizer | torch.optim  | Required: Optimizer used in training data |
 | criterion | function | Required: Fucntion used to calculate the loss during training |
+| scheduler | torch.optim.lr_scheduler | Required: Learning-rate scheduler stepped after every training batch |
 
 
 #### Test model
