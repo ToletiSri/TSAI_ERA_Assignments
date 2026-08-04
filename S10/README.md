@@ -90,7 +90,23 @@ Padding to `40×40` followed by a `32×32` random crop is equivalent to allowing
 
 #### Learning-rate selection and scheduling
 
-An LR range test sweeps exponentially up to 10 to identify a useful high learning rate. Training then uses Adam with weight decay and steps `OneCycleLR` after every batch:
+Before the full training run, an **LR range test** tries progressively larger learning rates over 200 mini-batches. `step_mode="exp"` means that the rate is multiplied by a constant factor between batches, rather than increased by a fixed amount. The test stops when the trial rate reaches 10 and plots loss against learning rate:
+
+```python
+lr_finder = LRFinder(model, optimizer, criterion, device="cuda")
+lr_finder.range_test(
+    train_loader,
+    end_lr=10,
+    num_iter=200,
+    step_mode="exp",
+)
+lr_finder.plot()
+lr_finder.reset()
+```
+
+The value `10` is only the upper boundary of this short search; it is **not** the learning rate used for the 24-epoch training run. The useful region is read from the plot—typically where loss is falling rapidly but before it becomes unstable. Based on that experiment, `4.51e-2` was selected as the maximum rate for `OneCycleLR`.
+
+The full training run then uses Adam with weight decay and steps `OneCycleLR` after every batch:
 
 ```python
 optimizer = optim.Adam(model.parameters(), lr=0.03, weight_decay=1e-4)
