@@ -1,67 +1,29 @@
-# The School of AI - ERA(Extensive & Reimagined AI Program) - Assignment 18
+# Session 18 — U-Net Segmentation and Conditional VAEs
 
-This folder consists of Assignment-18 from ERA course offered by - TSAI(The school of AI). 
-Follow https://theschoolof.ai/ for more updates on TSAI
+This two-part assignment studies dense prediction with U-Net and conditional generation with variational autoencoders.
 
-Assignment-18
-With this assignment, we move towards generative AI training.  The assignment consists of 2 parts:
+## Core concepts
 
-- Part 1 (UNETs):
-    --  Train your own UNet from scratch, you can use the dataset and strategy provided in this [link](https://medium.com/geekculture/u-net-implementation-from-scratch-using-tensorflow-b4342266e406/) . You could also use the [dice loss function/UNET code](https://canvas.instructure.com/courses/6743641/assignments/37210228?module_item_id=94020701) discussed in the class. However, you need to train it 4 times with the following strategies
-    1. MaxPooling + Transpose Convolution + Binary Cross Entropy loss
-    2. MaxPooling + Transpose Convolution + Dice Loss
-    3. Strided Convolution + Transpose Convolution + Binary Cross Entropy loss
-    4.  Strided Convolution + Upsampling + Dice Loss
-    
-- Part 2 (VAEs)
--- Use this [VAE code](https://colab.research.google.com/drive/1_yGmk8ahWhDs23U4mpplBFa-39fsEJoT?usp=sharing) for reference. However, you need to train the input image along with the label. You could take a combination of input/label as the input to the encoder block or both encoder and decoder. For inferencing, use an image with wrong label and see if your output starts looking like the wrong label. Repeat the iteration for 25 times to get 25 outputs. 
-HINT: You need to have some percent of incorrect input-label pairs duting your training. 
--- Repeat this for 2 datasets - MNIST and CIFAR-10
+### U-Net segmentation
 
+- An encoder contracts spatial features while a decoder restores resolution.
+- Skip connections preserve fine detail by joining encoder features to matching decoder stages.
+- Four experiments compare max pooling with strided convolution, transposed convolution with interpolation, and binary cross-entropy with Dice loss.
+- Dice loss directly optimizes overlap and is useful when foreground/background pixels are imbalanced.
 
+### Conditional variational autoencoders
 
-### RESULTS:
+- An encoder learns a distribution in latent space rather than a single deterministic code.
+- The reparameterization trick permits gradients through stochastic latent sampling.
+- Reconstruction and KL-divergence terms balance fidelity against a smooth, sampleable latent space.
+- Labels condition MNIST and CIFAR-10 reconstruction; deliberately incorrect image/label pairs demonstrate how repeated optimization shifts output toward the supplied class.
 
-- Part 1:
-UNET
+## Contents
 
- MaxPooling(Contracting Block) + Transpose Convolution(Expanding Block) + Cross Entropy Loss:
- 
-[![](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/MP_Tr_CE.png)](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/MP_Tr_CE.png)
+- `Part1/` contains shared U-Net code plus four notebooks for the downsampling, upsampling, and loss combinations.
+- `Part2/` contains the conditional VAE, Lightning data modules, utilities, and MNIST/CIFAR-10 experiments.
+- Result images are stored beneath each part and displayed by the notebooks.
 
- MaxPooling(Contracting Block) + Transpose Convolution(Expanding Block) + Dice Loss:
- 
-[![](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/MP_Tr_DL.png)](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/MP_Tr_DL.png)
+## Observations
 
- StridedConvolution(Contracting Block) + Transpose Convolution(Expanding Block) + Cross Entropy Loss:
- 
-[![](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/StrConv_Tr_CE.png)](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/StrConv_Tr_CE.png)
-
- StridedConvolution(Contracting Block) + Upsampling (Expanding Block) + Dice Loss:
- 
-[![](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/StrConv_Ups_DL.png)](https://github.com/ToletiSri/TSAI_ERA_Assignments/blob/0780bdde66335d4252511f48907ff512698c213c/S18/Part1/results_images/StrConv_Ups_DL.png)
-
-- Part 2: 
--- MNIST: 
-An image of digit-5, generated using VAE:
-
-[![](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/Digit5.png)](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/Digit5.png)
-
-An image of digit-5, being trained with wrong label - 9, over 25 iterations:
-
-[![](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/Digit5ToDigit9.png)](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/Digit5ToDigit9.png)
-
-
-
-
--- CIFAR10:
-
-An image of horse, generated using VAE:
-
-[![](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/horse.png)](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/horse.png)
-
-An image of horse being trained with wrong label - 'Bird', over 25 iterations
-(You can see that the legs of the horse start to disappear by 25th iteration)
-
-[![](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/HorseToBird.png)](https://raw.githubusercontent.com/ToletiSri/TSAI_ERA_Assignments/main/S18/Part2/ImagesForReadme/HorseToBird.png)
-
+The segmentation runs provide side-by-side qualitative comparisons of architectural and loss choices. In the VAE experiments, a digit 5 conditioned as 9 gradually acquires features of a 9, while a horse conditioned as a bird progressively loses horse-like structure over 25 iterations.
