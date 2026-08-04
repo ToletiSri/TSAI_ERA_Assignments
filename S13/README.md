@@ -1,46 +1,32 @@
-# The School of AI - ERA(Extensive & Reimagined AI Program) - Assignment 13
+# Session 13 — YOLOv3 Object Detection
 
-This folder consists of Assignment-13 from ERA course offered by - TSAI(The school of AI). 
-Follow https://theschoolof.ai/ for more updates on TSAI
+This assignment ports a YOLOv3 training pipeline to PyTorch Lightning and trains it for multi-class object detection.
 
-Assignment-13
-Move the given YOLO V3 code to PytorchLightning
-Train the model to reach such that all of these are true:
-- Class accuracy is more than 75%
-- No Obj accuracy of more than 95%
-- Object Accuracy of more than 70% (assuming you had to reduce the kernel numbers, else 80/98/78)
-- Ideally trailed till 40 epochs
+## Core concepts
 
-Add these training features:
-- Add multi-resolution training - the code shared trains only on one resolution 416
-- Add Implement Mosaic Augmentation only 75% of the times
-- Train on float16
+- **YOLOv3 architecture:** residual feature extraction and predictions at three scales for objects of different sizes.
+- **Anchor-based detection:** each grid cell predicts box offsets, objectness, and class scores relative to predefined anchors.
+- **Detection loss:** combines bounding-box regression, object/no-object confidence, and classification losses.
+- **Data augmentation:** Albumentations transforms and mosaic augmentation expand the variety of training scenes.
+- **Mixed-precision training:** Lightning and 16-bit arithmetic reduce memory use and speed up training.
+- **Detection metrics and post-processing:** intersection over union (IoU), non-maximum suppression (NMS), class/objectness accuracy, and mean average precision (mAP).
+- **Deployment and interpretability:** utilities visualize detections and support a Hugging Face demo workflow.
 
-GradCam must be implemented.
-Things that are allowed due to HW constraints:
-- Change of batch size
-- Change of resolution
-- Change of OCP parameters
+## Implementation map
 
-Once done:
-Move the app to HuggingFace Spaces
-- Allow custom upload of images
-- Share some samples from the existing dataset
-- Show the GradCAM output for the image that the user uploads as well as for the samples.
-- Mention things like: classes that your model support link to the actual model
+- `model.py` defines YOLOv3 blocks and multi-scale prediction heads.
+- `dataset.py` prepares images, bounding boxes, anchors, and mosaic samples.
+- `loss.py` implements the YOLO loss.
+- `LightningModel.py` contains the Lightning training and validation workflow with One Cycle learning-rate scheduling.
+- `utils.py` provides IoU, NMS, mAP, checkpointing, and visualization helpers.
+- `config.py` centralizes anchors, image sizes, transforms, and training settings.
+- `S13.ipynb` runs the experiment.
 
-### RESULTS:
+## Recorded results
 
-Train Accuracy:
-Class accuracy is: 82.711205%
-No obj accuracy is: 98.512054%
-Obj accuracy is: 63.684509%
+| Split | Class accuracy | No-object accuracy | Object accuracy |
+| --- | ---: | ---: | ---: |
+| Train | 82.71% | 98.51% | 63.68% |
+| Test | 79.26% | 98.68% | 55.93% |
 
-Test Accuracy:
-Class accuracy is: 79.258514%
-No obj accuracy is: 98.677887%
-Obj accuracy is: 55.932331%
-
-
-### Hugging Face - Spaces app:
-https://huggingface.co/spaces/ToletiSri/TSAI_S13
+The associated [Hugging Face Space](https://huggingface.co/spaces/ToletiSri/TSAI_S13) accepts images for inference.
